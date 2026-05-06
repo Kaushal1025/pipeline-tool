@@ -1,1 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Digital Pipeline Tool — Kaushal Pagadala</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0c10;--panel:#111318;--panel2:#181b22;--border:#2a2e3a;
+    --accent:#00e5ff;--accent2:#7c4dff;--green:#00c96b;--amber:#ffb300;--red:#ff4757;
+    --text:#e8eaf0;--muted:#6b7280;--mono:'JetBrains Mono',monospace;--display:'Syne',sans-serif;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px}
 
+  .app{display:grid;grid-template-columns:220px 1fr 260px;grid-template-rows:48px 1fr 180px;height:100vh;gap:1px;background:var(--border)}
+  .topbar{grid-column:1/-1;background:var(--panel);display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid var(--border)}
+  .logo{font-family:var(--display);font-size:15px;font-weight:800;color:var(--accent);letter-spacing:-.5px}
+  .logo span{color:var(--text);font-weight:400}
+  .tab-row{display:flex;gap:2px;margin-left:auto}
+  .tab{padding:6px 14px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:500;color:var(--muted);transition:.15s;border:none;background:none;font-family:var(--mono)}
+  .tab.active,.tab:hover{background:var(--panel2);color:var(--text)}
+  .tab.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);margin-left:8px}
+
+  .sidebar{background:var(--panel);padding:12px 0;overflow-y:auto}
+  .sidebar-section{margin-bottom:20px}
+  .sidebar-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;padding:0 12px;margin-bottom:8px}
+  .asset-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;transition:.1s;border-left:2px solid transparent}
+  .asset-item:hover{background:var(--panel2);border-left-color:var(--border)}
+  .asset-item.sel{background:rgba(0,229,255,.07);border-left-color:var(--accent);color:var(--accent)}
+  .asset-icon{width:20px;height:20px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+  .icon-mesh{background:rgba(0,229,255,.15);color:var(--accent)}
+  .icon-anim{background:rgba(124,77,255,.15);color:var(--accent2)}
+  .icon-rig{background:rgba(0,201,107,.15);color:var(--green)}
+  .asset-name{font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .asset-tag{font-size:9px;padding:2px 5px;border-radius:2px;background:var(--border);color:var(--muted)}
+
+  .viewport{background:var(--bg);position:relative;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  .viewport-overlay{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .vp-badge{background:rgba(10,12,16,.8);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:10px;color:var(--muted)}
+  .vp-badge span{color:var(--accent)}
+  .toolbar{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:4px}
+  .tool-btn{width:32px;height:32px;background:var(--panel);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:.15s;color:var(--muted);font-family:var(--mono)}
+  .tool-btn:hover,.tool-btn.active{background:var(--panel2);color:var(--accent);border-color:var(--accent)}
+
+  .inspector{background:var(--panel);padding:12px;overflow-y:auto}
+  .insp-title{font-family:var(--display);font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  .prop-group{margin-bottom:16px}
+  .prop-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+  .prop-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .prop-name{font-size:11px;color:var(--muted);width:60px;flex-shrink:0}
+  .prop-val{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:4px 7px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;width:100%}
+  .prop-val:focus{border-color:var(--accent)}
+  .prop-vec{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+  .prop-vec input{background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:4px 5px;font-size:11px;color:var(--text);font-family:var(--mono);outline:none;text-align:center;width:100%}
+  .prop-vec input:focus{border-color:var(--accent)}
+  .slider-wrap{display:flex;align-items:center;gap:8px;flex:1}
+  .slider-wrap input[type=range]{flex:1;accent-color:var(--accent)}
+  .slider-val{font-size:11px;color:var(--accent);min-width:30px;text-align:right}
+  .btn-row{display:flex;gap:6px;margin-top:8px}
+  .btn{padding:6px 12px;border-radius:4px;font-size:11px;font-family:var(--mono);font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text);transition:.15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+  .btn.primary:hover{background:#00c8e0}
+  .btn.danger{border-color:var(--red);color:var(--red)}
+  .btn.success{border-color:var(--green);color:var(--green);background:rgba(0,201,107,.08)}
+
+  .timeline{grid-column:1/-1;background:var(--panel);border-top:1px solid var(--border);display:flex;flex-direction:column}
+  .timeline-head{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border)}
+  .tl-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+  .tl-controls{display:flex;gap:4px}
+  .tl-btn{width:26px;height:26px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:.15s;font-family:var(--mono)}
+  .tl-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .frame-display{background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:4px 10px;font-size:12px;color:var(--accent);min-width:60px;text-align:center}
+  .fps-label{font-size:11px;color:var(--muted)}
+  .timeline-tracks{flex:1;overflow-x:auto;padding:8px 0}
+  .track{display:flex;align-items:center;height:28px}
+  .track-name{width:80px;padding:0 10px;font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track-lane{flex:1;height:18px;background:var(--panel2);border-radius:3px;position:relative;margin-right:12px;cursor:pointer}
+  .keyframe{position:absolute;width:8px;height:8px;background:var(--accent);border-radius:50%;top:50%;transform:translateY(-50%) rotate(45deg);cursor:grab}
+  .keyframe.sel{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--red);pointer-events:none;transition:left .05s linear}
+
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+  .pill-ok{background:rgba(0,201,107,.12);color:var(--green);border:1px solid rgba(0,201,107,.2)}
+  .pill-warn{background:rgba(255,179,0,.12);color:var(--amber);border:1px solid rgba(255,179,0,.2)}
+  .pill-err{background:rgba(255,71,87,.12);color:var(--red);border:1px solid rgba(255,71,87,.2)}
+
+  .progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+
+  .export-panel{position:absolute;bottom:12px;right:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px;min-width:170px;display:none;z-index:10}
+  .export-panel.show{display:block}
+  .export-opt{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;cursor:pointer;transition:.1s}
+  .export-opt:hover{background:var(--panel2)}
+  .export-opt-text{font-size:11px}
+  .export-opt-ext{font-size:10px;color:var(--muted)}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="logo">PIPE<span>LINE</span> <span style="color:var(--accent2);font-size:11px;font-weight:500">v2.4</span></div>
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab(this,'model')">MODEL</button>
+      <button class="tab" onclick="switchTab(this,'rig')">RIG</button>
+      <button class="tab" onclick="switchTab(this,'animate')">ANIMATE</button>
+      <button class="tab" onclick="switchTab(this,'export')">EXPORT</button>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)">
+      <div class="status-dot"></div><span style="color:var(--green)">Pipeline Active</span>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Scene Assets</div>
+      <div class="asset-item sel" onclick="selectAsset(this,'Hero_Character')">
+        <div class="asset-icon icon-mesh">M</div>
+        <span class="asset-name">Hero_Character</span>
+        <span class="asset-tag">mesh</span>
+      </div>
+      <div class="asset-item" onclick="selectAsset(this,'Spine_Root')">
+        <div class="asset-icon icon-rig">R</div>
+        <span class="asset-name">Spine_Root</span>
+        <span class="asset-tag">jnt</span>
+      </div>
+      <div class="asset-item" onclick="selectAsset(this,'Walk_Cycle')">
+        <div class="asset-icon icon-anim">A</div>
+        <span class="asset-name">Walk_Cycle</span>
+        <span class="asset-tag">anim</span>
+      </div>
+      <div class="asset-item" onclick="selectAsset(this,'Ride_Vehicle_01')">
+        <div class="asset-icon icon-mesh">M</div>
+        <span class="asset-name">Ride_Vehicle_01</span>
+        <span class="asset-tag">mesh</span>
+      </div>
+      <div class="asset-item" onclick="selectAsset(this,'Animatronic_Arm')">
+        <div class="asset-icon icon-rig">R</div>
+        <span class="asset-name">Animatronic_Arm</span>
+        <span class="asset-tag">jnt</span>
+      </div>
+      <div class="asset-item" onclick="selectAsset(this,'Projector_Sim')">
+        <div class="asset-icon icon-anim">A</div>
+        <span class="asset-name">Projector_Sim</span>
+        <span class="asset-tag">sim</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Pipeline Status</div>
+      <div style="padding:0 12px">
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--muted)">Skin Weights</span><span class="pill pill-ok">✓ Clean</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--muted)">UV Layout</span><span class="pill pill-ok">✓ Clean</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:88%"></div></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--muted)">Rig Controls</span><span class="pill pill-warn">⚠ 2 Warn</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:72%;background:var(--amber)"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:var(--muted)">Export Ready</span><span class="pill pill-err">✗ Not Ready</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:40%;background:var(--red)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <canvas id="glcanvas"></canvas>
+    <div class="viewport-overlay">
+      <div class="vp-badge">Mode: <span id="vp-mode">Perspective</span></div>
+      <div class="vp-badge">Polys: <span>12,847</span></div>
+      <div class="vp-badge">Frame: <span id="vp-frame">001</span></div>
+    </div>
+    <div class="toolbar">
+      <div class="tool-btn active" title="Select" onclick="setTool(this)">↖</div>
+      <div class="tool-btn" title="Move" onclick="setTool(this)">⊕</div>
+      <div class="tool-btn" title="Rotate" onclick="setTool(this)">↻</div>
+      <div class="tool-btn" title="Scale" onclick="setTool(this)">⤡</div>
+      <div class="tool-btn" title="Toggle Grid" onclick="toggleGrid(this)">⊞</div>
+      <div class="tool-btn" title="Wireframe" onclick="toggleWire(this)">◈</div>
+    </div>
+    <div class="export-panel" id="exp-panel">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Export Format</div>
+      <div class="export-opt" onclick="doExport('FBX')"><span style="font-size:16px">📦</span><div><div class="export-opt-text">FBX Binary</div><div class="export-opt-ext">.fbx — Maya/Unity/UE</div></div></div>
+      <div class="export-opt" onclick="doExport('OBJ')"><span style="font-size:16px">🗂</span><div><div class="export-opt-text">Wavefront OBJ</div><div class="export-opt-ext">.obj — Universal</div></div></div>
+      <div class="export-opt" onclick="doExport('USD')"><span style="font-size:16px">🎬</span><div><div class="export-opt-text">USD / USDZ</div><div class="export-opt-ext">.usd — VFX Pipeline</div></div></div>
+      <div class="export-opt" onclick="doExport('glTF')"><span style="font-size:16px">🌐</span><div><div class="export-opt-text">glTF 2.0</div><div class="export-opt-ext">.gltf — Web/AR</div></div></div>
+    </div>
+  </div>
+
+  <div class="inspector">
+    <div class="insp-title" id="insp-name">Hero_Character</div>
+    <div class="prop-group">
+      <div class="prop-label">Transform</div>
+      <div class="prop-row"><span class="prop-name">Translate</span><div class="prop-vec"><input value="0.000"><input value="0.000"><input value="0.000"></div></div>
+      <div class="prop-row"><span class="prop-name">Rotate</span><div class="prop-vec"><input value="0.000"><input value="45.000"><input value="0.000"></div></div>
+      <div class="prop-row"><span class="prop-name">Scale</span><div class="prop-vec"><input value="1.000"><input value="1.000"><input value="1.000"></div></div>
+    </div>
+    <div class="prop-group" id="rig-group">
+      <div class="prop-label">Rig Controls</div>
+      <div class="prop-row">
+        <span class="prop-name">IK/FK</span>
+        <div class="slider-wrap">
+          <input type="range" min="0" max="100" value="60" oninput="this.nextElementSibling.textContent=this.value+'%'">
+          <span class="slider-val">60%</span>
+        </div>
+      </div>
+      <div class="prop-row">
+        <span class="prop-name">Stretch</span>
+        <div class="slider-wrap">
+          <input type="range" min="0" max="100" value="30" oninput="this.nextElementSibling.textContent=this.value+'%'">
+          <span class="slider-val">30%</span>
+        </div>
+      </div>
+      <div class="prop-row">
+        <span class="prop-name">Twist</span>
+        <div class="slider-wrap">
+          <input type="range" min="-180" max="180" value="0" oninput="this.nextElementSibling.textContent=this.value+'°'">
+          <span class="slider-val">0°</span>
+        </div>
+      </div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-label">Skinning</div>
+      <div class="prop-row"><span class="prop-name">Influences</span><input class="prop-val" value="4" style="width:60px"></div>
+      <div class="prop-row"><span class="prop-name">Method</span>
+        <select class="prop-val" style="flex:1">
+          <option>Linear Blend</option><option>Dual Quaternion</option><option>Corrective</option>
+        </select>
+      </div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-label">Export Settings</div>
+      <div class="prop-row"><span class="prop-name">FPS</span>
+        <select class="prop-val" style="flex:1">
+          <option>24 fps</option><option selected>30 fps</option><option>60 fps</option>
+        </select>
+      </div>
+      <div class="prop-row"><span class="prop-name">Scale</span><input class="prop-val" value="1.0" style="width:60px"></div>
+      <div class="prop-row"><span class="prop-name">Up Axis</span>
+        <select class="prop-val" style="flex:1">
+          <option selected>Y-Up</option><option>Z-Up</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="runAutoRig()">Auto-Rig</button>
+      <button class="btn" onclick="bakeAnim()">Bake Anim</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn success" onclick="validateMesh()">Validate</button>
+      <button class="btn danger" onclick="resetPose()">Reset Pose</button>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-head">
+      <div class="tl-title">Timeline</div>
+      <div class="tl-controls">
+        <button class="tl-btn" onclick="tlSkip(-10)">⏮</button>
+        <button class="tl-btn" onclick="tlStep(-1)">◀</button>
+        <button class="tl-btn" id="play-btn" onclick="togglePlay()">▶</button>
+        <button class="tl-btn" onclick="tlStep(1)">▶</button>
+        <button class="tl-btn" onclick="tlSkip(10)">⏭</button>
+      </div>
+      <div class="frame-display" id="frame-num">001 / 120</div>
+      <span class="fps-label">30 fps</span>
+      <div style="display:flex;gap:4px;margin-left:16px">
+        <button class="btn" onclick="addKey()">+ Keyframe</button>
+        <button class="btn" onclick="toggleExportPanel()">Export ↗</button>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:12px;font-size:11px;color:var(--muted)">
+        <span>Start: <span style="color:var(--text)">001</span></span>
+        <span>End: <span style="color:var(--text)">120</span></span>
+      </div>
+    </div>
+    <div class="timeline-tracks" id="tl-tracks"></div>
+  </div>
+</div>
+
+<script>
+const TOTAL_FRAMES = 120;
+let currentFrame = 1, playing = false, playInterval = null;
+let showGrid = true, wireframe = false;
+let rotY = 0.4, rotX = 0.2;
+let dragging = false, lastMX = 0, lastMY = 0;
+let exportPanelOpen = false;
+
+const canvas = document.getElementById('glcanvas');
+const gl = canvas.getContext('webgl');
+
+function resizeCanvas() {
+  const vp = document.getElementById('viewport');
+  canvas.width = vp.clientWidth;
+  canvas.height = vp.clientHeight;
+}
+
+const vsSource = `
+  attribute vec3 aPos; attribute vec3 aNorm;
+  uniform mat4 uMVP; uniform mat4 uModel;
+  varying vec3 vNorm; varying vec3 vPos;
+  void main(){
+    vNorm = mat3(uModel) * aNorm;
+    vPos = (uModel * vec4(aPos,1.0)).xyz;
+    gl_Position = uMVP * vec4(aPos,1.0);
+  }`;
+const fsSource = `
+  precision mediump float;
+  varying vec3 vNorm; varying vec3 vPos;
+  uniform int uWire; uniform vec3 uColor;
+  void main(){
+    if(uWire==1){gl_FragColor=vec4(0.0,0.9,1.0,1.0);return;}
+    vec3 light=normalize(vec3(1.,1.8,1.5));
+    vec3 norm=normalize(vNorm);
+    float d=max(dot(norm,light),0.0);
+    float rim=pow(1.0-max(dot(norm,normalize(-vPos)),0.0),2.5)*0.3;
+    vec3 col=uColor*(0.15+d*0.8)+rim*vec3(0.,0.9,1.)*0.4;
+    gl_FragColor=vec4(col,1.0);
+  }`;
+
+function compileShader(src,type){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+const prog=gl.createProgram();
+gl.attachShader(prog,compileShader(vsSource,gl.VERTEX_SHADER));
+gl.attachShader(prog,compileShader(fsSource,gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);gl.useProgram(prog);
+
+const aPos=gl.getAttribLocation(prog,'aPos'),aNorm=gl.getAttribLocation(prog,'aNorm');
+const uMVP=gl.getUniformLocation(prog,'uMVP'),uModel=gl.getUniformLocation(prog,'uModel');
+const uWire=gl.getUniformLocation(prog,'uWire'),uColor=gl.getUniformLocation(prog,'uColor');
+
+function genSphere(lat,lon){
+  const v=[],n=[],idx=[];
+  for(let i=0;i<=lat;i++){const t=i*Math.PI/lat;for(let j=0;j<=lon;j++){const p=j*2*Math.PI/lon,x=Math.sin(t)*Math.cos(p),y=Math.cos(t),z=Math.sin(t)*Math.sin(p);v.push(x,y,z);n.push(x,y,z);}}
+  for(let i=0;i<lat;i++){for(let j=0;j<lon;j++){const a=i*(lon+1)+j,b=a+lon+1;idx.push(a,b,a+1,b,b+1,a+1);}}
+  return{verts:new Float32Array(v),norms:new Float32Array(n),idx:new Uint16Array(idx)};
+}
+function genBox(sx,sy,sz){
+  const hx=sx/2,hy=sy/2,hz=sz/2;
+  const v=[-hx,-hy,hz,hx,-hy,hz,hx,hy,hz,-hx,hy,hz,-hx,-hy,-hz,-hx,hy,-hz,hx,hy,-hz,hx,-hy,-hz,-hx,hy,-hz,-hx,hy,hz,hx,hy,hz,hx,hy,-hz,-hx,-hy,-hz,hx,-hy,-hz,hx,-hy,hz,-hx,-hy,hz,hx,-hy,-hz,hx,hy,-hz,hx,hy,hz,hx,-hy,hz,-hx,-hy,-hz,-hx,-hy,hz,-hx,hy,hz,-hx,hy,-hz];
+  const n=[0,0,1,0,0,1,0,0,1,0,0,1,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,1,0,0,1,0,0,1,0,0,1,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,1,0,0,1,0,0,1,0,0,1,0,0,-1,0,0,-1,0,0,-1,0,0,-1,0,0];
+  const idx=[];for(let i=0;i<6;i++){const b=i*4;idx.push(b,b+1,b+2,b,b+2,b+3);}
+  return{verts:new Float32Array(v),norms:new Float32Array(n),idx:new Uint16Array(idx)};
+}
+function createBuf(data,type){const b=gl.createBuffer();gl.bindBuffer(type,b);gl.bufferData(type,data,gl.STATIC_DRAW);return b;}
+
+const sphere=genSphere(20,24);
+const sVB=createBuf(sphere.verts,gl.ARRAY_BUFFER),sNB=createBuf(sphere.norms,gl.ARRAY_BUFFER),sIB=createBuf(sphere.idx,gl.ELEMENT_ARRAY_BUFFER);
+const torso=genBox(0.6,0.9,0.35);
+const tVB=createBuf(torso.verts,gl.ARRAY_BUFFER),tNB=createBuf(torso.norms,gl.ARRAY_BUFFER),tIB=createBuf(torso.idx,gl.ELEMENT_ARRAY_BUFFER);
+const limb=genBox(0.18,0.55,0.18);
+const lVB=createBuf(limb.verts,gl.ARRAY_BUFFER),lNB=createBuf(limb.norms,gl.ARRAY_BUFFER),lIB=createBuf(limb.idx,gl.ELEMENT_ARRAY_BUFFER);
+
+function I(){return[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];}
+function mul(a,b){const r=new Array(16).fill(0);for(let i=0;i<4;i++)for(let j=0;j<4;j++)for(let k=0;k<4;k++)r[i*4+j]+=a[i*4+k]*b[k*4+j];return r;}
+function RY(a){const c=Math.cos(a),s=Math.sin(a);return[c,0,s,0,0,1,0,0,-s,0,c,0,0,0,0,1];}
+function RX(a){const c=Math.cos(a),s=Math.sin(a);return[1,0,0,0,0,c,-s,0,0,s,c,0,0,0,0,1];}
+function T(x,y,z){return[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];}
+function S(x,y,z){return[x,0,0,0,0,y,0,0,0,0,z,0,0,0,0,1];}
+function persp(fov,asp,n,f){const t=1/Math.tan(fov/2),r=1/(n-f);return[t/asp,0,0,0,0,t,0,0,0,0,(n+f)*r,-1,0,0,2*n*f*r,0];}
+
+const gridV=[];for(let i=-10;i<=10;i++){gridV.push(i,0,-10,i,0,10,-10,0,i,10,0,i);}
+const gVB=createBuf(new Float32Array(gridV),gl.ARRAY_BUFFER);
+const gNB=createBuf(new Float32Array(gridV.length).fill(0),gl.ARRAY_BUFFER);
+const gCount=gridV.length/3;
+
+let mvp=I();
+
+function bind(vb,nb,ib){
+  gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.enableVertexAttribArray(aPos);gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0);
+  gl.bindBuffer(gl.ARRAY_BUFFER,nb);gl.enableVertexAttribArray(aNorm);gl.vertexAttribPointer(aNorm,3,gl.FLOAT,false,0,0);
+  if(ib)gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+}
+function drawMesh(vb,nb,ib,cnt,model,color){
+  bind(vb,nb,ib);
+  gl.uniformMatrix4fv(uModel,false,model);gl.uniformMatrix4fv(uMVP,false,mul(mvp,model));
+  gl.uniform3fv(uColor,color);gl.uniform1i(uWire,wireframe?1:0);
+  wireframe?gl.drawElements(gl.LINE_STRIP,cnt,gl.UNSIGNED_SHORT,0):gl.drawElements(gl.TRIANGLES,cnt,gl.UNSIGNED_SHORT,0);
+}
+
+function drawScene(){
+  resizeCanvas();
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.clearColor(0.039,0.047,0.063,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);
+  const asp=canvas.width/canvas.height;
+  mvp=mul(persp(0.9,asp,0.1,100),mul(T(0,-0.5,-4.5),mul(RX(rotX),RY(rotY))));
+
+  if(showGrid){
+    bind(gVB,gNB,null);gl.uniformMatrix4fv(uModel,false,I());gl.uniformMatrix4fv(uMVP,false,mvp);
+    gl.uniform3fv(uColor,[0.16,0.18,0.22]);gl.uniform1i(uWire,0);gl.drawArrays(gl.LINES,0,gCount);
+  }
+
+  const w=(currentFrame-1)/TOTAL_FRAMES;
+  const ls=Math.sin(w*Math.PI*4)*0.45,as=Math.sin(w*Math.PI*4+Math.PI)*0.35,bb=Math.abs(Math.sin(w*Math.PI*4))*0.05;
+  const bc=wireframe?[0,0.9,1]:[0.18,0.55,0.88],hc=wireframe?[0,0.9,1]:[0.92,0.75,0.6],lc=wireframe?[0,0.9,1]:[0.15,0.45,0.75],ac=[0,0.9,1];
+
+  drawMesh(tVB,tNB,tIB,torso.idx.length,T(0,bb,0),bc);
+
+  const hm=mul(T(0,bb+0.7,0),S(0.32,0.32,0.32));
+  bind(sVB,sNB,sIB);gl.uniformMatrix4fv(uModel,false,hm);gl.uniformMatrix4fv(uMVP,false,mul(mvp,hm));
+  gl.uniform3fv(uColor,hc);gl.uniform1i(uWire,wireframe?1:0);
+  gl.drawElements(wireframe?gl.LINE_STRIP:gl.TRIANGLES,sphere.idx.length,gl.UNSIGNED_SHORT,0);
+
+  drawMesh(lVB,lNB,lIB,limb.idx.length,mul(T(-0.42,bb+0.17,0),mul(RX(as),T(0,-0.27,0))),lc);
+  drawMesh(lVB,lNB,lIB,limb.idx.length,mul(T(0.42,bb+0.17,0),mul(RX(-as),T(0,-0.27,0))),lc);
+  drawMesh(lVB,lNB,lIB,limb.idx.length,mul(T(-0.2,bb-0.63,0),mul(RX(ls),T(0,-0.27,0))),bc);
+  drawMesh(lVB,lNB,lIB,limb.idx.length,mul(T(0.2,bb-0.63,0),mul(RX(-ls),T(0,-0.27,0))),bc);
+
+  [[0,bb+0.45,0],[0,bb+0.15,0],[0,bb-0.2,0],[-0.42,bb+0.45,0],[0.42,bb+0.45,0]].forEach(([x,y,z])=>{
+    const jm=mul(T(x,y,z),S(0.04,0.04,0.04));
+    bind(sVB,sNB,sIB);gl.uniformMatrix4fv(uModel,false,jm);gl.uniformMatrix4fv(uMVP,false,mul(mvp,jm));
+    gl.uniform3fv(uColor,ac);gl.uniform1i(uWire,0);gl.drawElements(gl.TRIANGLES,sphere.idx.length,gl.UNSIGNED_SHORT,0);
+  });
+}
+
+canvas.addEventListener('mousedown',e=>{dragging=true;lastMX=e.clientX;lastMY=e.clientY;});
+document.addEventListener('mouseup',()=>dragging=false);
+document.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  rotY+=(e.clientX-lastMX)*0.008;rotX+=(e.clientY-lastMY)*0.006;
+  rotX=Math.max(-1.2,Math.min(1.2,rotX));lastMX=e.clientX;lastMY=e.clientY;drawScene();
+});
+
+function buildTimeline(){
+  const tracks=[{name:'Translate Y',keys:[5,15,30,50,70,90,110]},{name:'Rotate Y',keys:[1,20,40,60,80,100,120]},{name:'L_Arm Rot',keys:[10,25,40,55,70,85,100]},{name:'R_Arm Rot',keys:[10,25,40,55,70,85,100]},{name:'L_Leg Rot',keys:[5,20,35,50,65,80,95,110]}];
+  const c=document.getElementById('tl-tracks');c.innerHTML='';
+  tracks.forEach(t=>{
+    const d=document.createElement('div');d.className='track';
+    d.innerHTML=`<div class="track-name">${t.name}</div><div class="track-lane" onclick="seekTimeline(event,this)"></div>`;
+    c.appendChild(d);
+    const lane=d.querySelector('.track-lane');
+    t.keys.forEach(f=>{const k=document.createElement('div');k.className='keyframe';k.style.left=((f/TOTAL_FRAMES)*100)+'%';k.addEventListener('click',e=>{e.stopPropagation();k.classList.toggle('sel');});lane.appendChild(k);});
+    const ph=document.createElement('div');ph.className='playhead';ph.style.left='0%';lane.appendChild(ph);
+  });
+}
+
+function updatePlayheads(){
+  const p=((currentFrame-1)/(TOTAL_FRAMES-1)*100).toFixed(1)+'%';
+  document.querySelectorAll('.playhead').forEach(x=>x.style.left=p);
+  document.getElementById('frame-num').textContent=String(currentFrame).padStart(3,'0')+' / '+TOTAL_FRAMES;
+  document.getElementById('vp-frame').textContent=String(currentFrame).padStart(3,'0');
+}
+
+function seekTimeline(e,lane){const r=lane.getBoundingClientRect();currentFrame=Math.max(1,Math.min(TOTAL_FRAMES,Math.round((e.clientX-r.left)/r.width*TOTAL_FRAMES)));updatePlayheads();drawScene();}
+function togglePlay(){playing=!playing;document.getElementById('play-btn').textContent=playing?'⏸':'▶';if(playing){playInterval=setInterval(()=>{currentFrame=currentFrame>=TOTAL_FRAMES?1:currentFrame+1;updatePlayheads();drawScene();},1000/30);}else clearInterval(playInterval);}
+function tlStep(d){currentFrame=Math.max(1,Math.min(TOTAL_FRAMES,currentFrame+d));updatePlayheads();drawScene();}
+function tlSkip(d){currentFrame=Math.max(1,Math.min(TOTAL_FRAMES,currentFrame+d));updatePlayheads();drawScene();}
+function addKey(){document.querySelectorAll('.track-lane').forEach(lane=>{const k=document.createElement('div');k.className='keyframe sel';k.style.left=((currentFrame/TOTAL_FRAMES)*100)+'%';k.addEventListener('click',e=>{e.stopPropagation();k.classList.toggle('sel');});lane.insertBefore(k,lane.lastElementChild);});}
+function switchTab(el,mode){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('vp-mode').textContent={model:'Perspective',rig:'Joint',animate:'Animate',export:'Export'}[mode];document.getElementById('rig-group').style.display=(mode==='rig'||mode==='animate')?'':'none';}
+function selectAsset(el,name){document.querySelectorAll('.asset-item').forEach(a=>a.classList.remove('sel'));el.classList.add('sel');document.getElementById('insp-name').textContent=name;}
+function setTool(el){document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');}
+function toggleGrid(btn){showGrid=!showGrid;btn.style.color=showGrid?'var(--accent)':'';drawScene();}
+function toggleWire(btn){wireframe=!wireframe;btn.style.color=wireframe?'var(--accent)':'';drawScene();}
+function runAutoRig(){alert('Auto-rig complete — 12 joints generated, IK chains built.');}
+function bakeAnim(){alert('Animation baked to 30fps.');}
+function validateMesh(){alert('Validation complete. UV seam warning at poly 3847.');}
+function resetPose(){document.querySelectorAll('.prop-vec input').forEach((el,i)=>{el.value=(i>=6)?'1.000':'0.000';});drawScene();}
+function toggleExportPanel(){exportPanelOpen=!exportPanelOpen;document.getElementById('exp-panel').classList.toggle('show',exportPanelOpen);}
+function doExport(fmt){document.getElementById('exp-panel').classList.remove('show');exportPanelOpen=false;alert('Exported as .'+fmt.toLowerCase()+' — pipeline handoff ready.');}
+
+buildTimeline();updatePlayheads();
+(function loop(){drawScene();requestAnimationFrame(loop);})();
+</script>
+</body>
+</html>
